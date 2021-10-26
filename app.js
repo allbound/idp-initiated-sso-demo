@@ -157,7 +157,7 @@ app.post("/upload",function (req, res, next) {
         else {
 
             // SUCCESS, image successfully uploaded
-            res.send("Success hink, File uploaded!")
+            res.send("Success, File uploaded!")
         }
     })
 })
