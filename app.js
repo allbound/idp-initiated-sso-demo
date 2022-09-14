@@ -45,8 +45,6 @@ var upload = multer({
 // mypic is the name of file attribute
 }).single("mypic");
 
-
-
 passport.serializeUser(function(user, done) {
   done(null, user);
 });
@@ -55,32 +53,9 @@ passport.deserializeUser(function(user, done) {
   done(null, user);
 });
 
-const reader = new MetadataReader(fs.readFileSync(path.join(__dirname, './allbound_metadata.xml'), 'utf8'));
-const config = toPassportConfig(reader);
-
-fs.writeFile('/app/idp_cert.pem', config.cert, function(err) {
-  if(err) {
-      return console.log(err);
-  }
-  console.log("The file was saved!");
-}); 
-
-var samlStrategy = new saml.Strategy({
-  // URL that goes from the Identity Provider -> Service Provider
-  callbackUrl: "https://demosp-sso.dev.allbound.xyz/login/callback",
-  // URL that goes from the Service Provider -> Identity Provider
-  entryPoint: config.entryPoint,
-  issuer: config.identityProviderUrl,
-  identifierFormat: null,
-  // Identity Provider's public key
-  cert: fs.readFileSync(__dirname + '/idp_cert.pem', 'utf8'),
-  validateInResponseTo: false,
-  disableRequestedAuthnContext: true,
-    additionalParams: {'RelayState': 'rte'}
-}, function(profile, done) {
-  return done(null, profile); 
-});
-
+var reader = getMetadataReader();
+var config = getConfig(reader);
+var samlStrategy = getSamlStrategy();
 passport.use(samlStrategy);
 
 var app = express();
@@ -92,13 +67,49 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.set('view engine', 'ejs');
 
+function getMetadataReader()
+{
+    return new MetadataReader(fs.readFileSync(path.join(__dirname, './allbound_metadata.xml'), 'utf8'));
+}
+
+function getConfig(reader)
+{
+    var newConfig = toPassportConfig(reader);
+    fs.writeFile('/app/idp_cert.pem', newConfig.cert, function(err) {
+        if(err) {
+            return console.log(err);
+        }
+        console.log("The file was saved!");
+    });
+
+    return newConfig;
+}
+
+function getSamlStrategy()
+{
+    return new saml.Strategy({
+        // URL that goes from the Identity Provider -> Service Provider
+        callbackUrl: config.identityProviderUrl,
+        // URL that goes from the Service Provider -> Identity Provider
+        entryPoint: config.entryPoint,
+        issuer: config.identityProviderUrl,
+        identifierFormat: null,
+        // Identity Provider's public key
+        cert: fs.readFileSync(__dirname + '/idp_cert.pem', 'utf8'),
+        validateInResponseTo: false,
+        disableRequestedAuthnContext: true,
+        additionalParams: {'RelayState': 'rte'}
+    }, function(profile, done) {
+        return done(null, profile);
+    });
+}
+
 function ensureAuthenticated(req, res, next) {
   if (req.isAuthenticated())
     return next();
   else
     return res.redirect('/login/fail');
 }
-
 
 app.get('/',
   ensureAuthenticated, 
@@ -158,6 +169,11 @@ app.post("/upload",function (req, res, next) {
 
             // SUCCESS, image successfully uploaded
             res.send("Success, File uploaded!")
+
+            reader = getMetadataReader();
+            config = getConfig(reader);
+            samlStrategy = getSamlStrategy();
+            passport.use(samlStrategy);
         }
     })
 })
