@@ -53,12 +53,12 @@ passport.deserializeUser(function(user, done) {
   done(null, user);
 });
 
+var app = express();
+
 var reader = getMetadataReader();
 var config = getConfig(reader);
-var samlStrategy = getSamlStrategy();
+var samlStrategy = getSamlStrategy(app.request);
 passport.use(samlStrategy);
-
-var app = express();
 
 app.use(cookieParser());
 app.use(bodyParser());
@@ -85,11 +85,17 @@ function getConfig(reader)
     return newConfig;
 }
 
-function getSamlStrategy()
+function getSamlStrategy(req)
 {
+    var callbackUrl = (req.headers != undefined && req.headers["host"] != undefined)
+        ?
+        req.protocol + "://" + req.headers["host"] + "/login/callback"
+        :
+        "http://localhost:9090/login/callback";
+
     return new saml.Strategy({
         // URL that goes from the Identity Provider -> Service Provider
-        callbackUrl: config.identityProviderUrl,
+        callbackUrl: callbackUrl,
         // URL that goes from the Service Provider -> Identity Provider
         entryPoint: config.entryPoint,
         issuer: config.identityProviderUrl,
@@ -172,7 +178,7 @@ app.post("/upload",function (req, res, next) {
 
             reader = getMetadataReader();
             config = getConfig(reader);
-            samlStrategy = getSamlStrategy();
+            samlStrategy = getSamlStrategy(req);
             passport.use(samlStrategy);
         }
     })
