@@ -158,6 +158,8 @@ app.use(function(err, req, res, next) {
   next(err);
 });
 
+app.use(express.static('public'));
+
 app.post("/upload",function (req, res, next) {
 
     // Error MiddleWare for multer file upload, so if any
